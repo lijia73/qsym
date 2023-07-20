@@ -9,9 +9,7 @@ const int kMapSize = 65536;
 
 namespace {
 
-inline bool isPowerOfTwoOrZero(ADDRINT x) {
-  return ((x & (x - 1)) == 0);
-}
+inline bool isPowerOfTwoOrZero(ADDRINT x) { return ((x & (x - 1)) == 0); }
 
 XXH32_hash_t hashPc(ADDRINT pc, bool taken) {
   // // mimic afl's branch map
@@ -37,9 +35,9 @@ XXH32_hash_t hashPc(ADDRINT pc, bool taken) {
 } // namespace
 
 void AflTraceMap::allocMap() {
-  trace_map_ = (UINT8*)safeMalloc(kMapSize);
-  virgin_map_ = (UINT8*)safeMalloc(kMapSize);
-  context_map_ = (UINT8*)safeMalloc(kMapSize);
+  trace_map_ = (UINT8 *)safeMalloc(kMapSize);
+  virgin_map_ = (UINT8 *)safeMalloc(kMapSize);
+  context_map_ = (UINT8 *)safeMalloc(kMapSize);
   memset(virgin_map_, 0, kMapSize);
 }
 
@@ -56,8 +54,8 @@ void AflTraceMap::import(const std::string path) {
     setDefault();
     return;
   }
-  ifs.read((char*)trace_map_, kMapSize);
-  ifs.read((char*)context_map_, kMapSize);
+  ifs.read((char *)trace_map_, kMapSize);
+  ifs.read((char *)context_map_, kMapSize);
   if (!ifs)
     setDefault();
   ifs.close();
@@ -77,9 +75,7 @@ bool AflTraceMap::isInterestingContext(ADDRINT h, ADDRINT bits) {
   if (!isPowerOfTwoOrZero(bits))
     return false;
 
-  for (auto it = visited_.begin();
-      it != visited_.end();
-      it++) {
+  for (auto it = visited_.begin(); it != visited_.end(); it++) {
     ADDRINT prev_h = *it;
 
     // Calculate hash(prev_h || h)
@@ -110,16 +106,14 @@ void AflTraceMap::commit() {
     ofs.open(path_, ios::binary);
     if (ofs.fail())
       LOG_FATAL("Unable to open a bitmap to commit");
-    ofs.write((char*)trace_map_, kMapSize);
-    ofs.write((char*)context_map_, kMapSize);
+    ofs.write((char *)trace_map_, kMapSize);
+    ofs.write((char *)context_map_, kMapSize);
     ofs.close();
   }
 }
 
 AflTraceMap::AflTraceMap(const std::string path)
-  : path_(path),
-    prev_loc_(0),
-    visited_() {
+    : path_(path), prev_loc_(0), visited_() {
   allocMap();
   if (path.empty())
     setDefault();
@@ -127,7 +121,7 @@ AflTraceMap::AflTraceMap(const std::string path)
     import(path);
 }
 
-bool AflTraceMap::isInterestingBranch(ADDRINT pc, bool taken) {
+bool AflTraceMap::isInterestingBranch(ADDRINT pc, bool taken, bool want) {
   ADDRINT h = hashPc(pc, taken);
   ADDRINT idx = getIndex(h);
   bool new_context = isInterestingContext(h, virgin_map_[idx]);
@@ -136,25 +130,27 @@ bool AflTraceMap::isInterestingBranch(ADDRINT pc, bool taken) {
   virgin_map_[idx]++;
 
   if ((virgin_map_[idx] | trace_map_[idx]) != trace_map_[idx]) {
-    ADDRINT inv_h = hashPc(pc, !taken);
-    ADDRINT inv_idx = getIndex(inv_h);
 
     trace_map_[idx] |= virgin_map_[idx];
 
     // mark the inverse case, because it's already covered by current testcase
-    virgin_map_[inv_idx]++;
+    if (want != taken) {
+      ADDRINT inv_h = hashPc(pc, want);
+      ADDRINT inv_idx = getIndex(inv_h);
+      virgin_map_[inv_idx]++;
 
-    trace_map_[inv_idx] |= virgin_map_[inv_idx];
-    commit();
+      trace_map_[inv_idx] |= virgin_map_[inv_idx];
+      commit();
 
-    virgin_map_[inv_idx]--;
+      virgin_map_[inv_idx]--;
+      ret = false;
+    }
+
     ret = true;
-  }
-  else if (new_context) {
+  } else if (new_context) {
     ret = true;
     commit();
-  }
-  else
+  } else
     ret = false;
 
   prev_loc_ = h;
@@ -162,4 +158,3 @@ bool AflTraceMap::isInterestingBranch(ADDRINT pc, bool taken) {
 }
 
 } // namespace qsym
-

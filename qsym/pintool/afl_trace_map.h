@@ -32,7 +32,7 @@ private:
 
 public:
   AflTraceMap(const std::string path);
-  bool isInterestingBranch(ADDRINT pc, bool taken);
+  bool isInterestingBranch(ADDRINT pc, bool taken, bool want);
 };
 } // namespace qsym
 #endif // __AFL_TRACE_MAP_H__

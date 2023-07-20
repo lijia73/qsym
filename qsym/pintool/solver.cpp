@@ -1,6 +1,6 @@
-#include <set>
-#include <byteswap.h>
 #include "solver.h"
+#include <byteswap.h>
+#include <set>
 
 namespace qsym {
 
@@ -23,12 +23,12 @@ uint64_t getTimeStamp() {
   return tv.tv_sec * kUsToS + tv.tv_usec;
 }
 
-void parseConstSym(ExprRef e, Kind &op, ExprRef& expr_sym, ExprRef& expr_const) {
+void parseConstSym(ExprRef e, Kind &op, ExprRef &expr_sym,
+                   ExprRef &expr_const) {
   for (INT32 i = 0; i < 2; i++) {
     expr_sym = e->getChild(i);
     expr_const = e->getChild(1 - i);
-    if (!isConstant(expr_sym)
-        && isConstant(expr_const)) {
+    if (!isConstant(expr_sym) && isConstant(expr_const)) {
       op = i == 0 ? e->kind() : swapKind(e->kind());
       return;
     }
@@ -36,37 +36,35 @@ void parseConstSym(ExprRef e, Kind &op, ExprRef& expr_sym, ExprRef& expr_const) 
   UNREACHABLE();
 }
 
-void getCanonicalExpr(ExprRef e,
-    ExprRef* canonical,
-    llvm::APInt* adjustment=NULL) {
+void getCanonicalExpr(ExprRef e, ExprRef *canonical,
+                      llvm::APInt *adjustment = NULL) {
   ExprRef first = NULL;
   ExprRef second = NULL;
   // e == Const + Sym --> canonical == Sym
   switch (e->kind()) {
-    // TODO: handle Sub
-    case Add:
+  // TODO: handle Sub
+  case Add:
+    first = e->getFirstChild();
+    second = e->getSecondChild();
+    if (isConstant(first)) {
+      *canonical = second;
+      if (adjustment != NULL)
+        *adjustment = static_pointer_cast<ConstantExpr>(first)->value();
+      return;
+    case Sub:
+      // C_0 - Sym
       first = e->getFirstChild();
       second = e->getSecondChild();
+      // XXX: need to handle reference count
       if (isConstant(first)) {
-        *canonical = second;
+        *canonical = g_expr_builder->createNeg(second);
         if (adjustment != NULL)
-          *adjustment =
-            static_pointer_cast<ConstantExpr>(first)->value();
+          *adjustment = static_pointer_cast<ConstantExpr>(first)->value();
         return;
-      case Sub:
-        // C_0 - Sym
-        first = e->getFirstChild();
-        second = e->getSecondChild();
-        // XXX: need to handle reference count
-        if (isConstant(first)) {
-          *canonical = g_expr_builder->createNeg(second);
-          if (adjustment != NULL)
-            *adjustment = static_pointer_cast<ConstantExpr>(first)->value();
-          return;
-        }
       }
-    default:
-      break;
+    }
+  default:
+    break;
   }
   if (adjustment != NULL)
     *adjustment = llvm::APInt(e->bits(), 0);
@@ -74,30 +72,18 @@ void getCanonicalExpr(ExprRef e,
 }
 
 inline bool isEqual(ExprRef e, bool taken) {
-  return (e->kind() == Equal && taken) ||
-    (e->kind() == Distinct && !taken);
+  return (e->kind() == Equal && taken) || (e->kind() == Distinct && !taken);
 }
 
 } // namespace
 
-Solver::Solver(
-    const std::string input_file,
-    const std::string out_dir,
-    const std::string bitmap)
-  : input_file_(input_file)
-  , inputs_()
-  , out_dir_(out_dir)
-  , context_(*g_z3_context)
-  , solver_(z3::solver(context_, "QF_BV"))
-  , num_generated_(0)
-  , trace_(bitmap)
-  , last_interested_(false)
-  , syncing_(false)
-  , start_time_(getTimeStamp())
-  , solving_time_(0)
-  , last_pc_(0)
-  , dep_forest_()
-{
+Solver::Solver(const std::string input_file, const std::string out_dir,
+               const std::string bitmap)
+    : input_file_(input_file), inputs_(), out_dir_(out_dir),
+      context_(*g_z3_context), solver_(z3::solver(context_, "QF_BV")),
+      num_generated_(0), trace_(bitmap), last_interested_(false),
+      syncing_(false), start_time_(getTimeStamp()), solving_time_(0),
+      last_pc_(0), dep_forest_() {
   // Set timeout for solver
   z3::params p(context_);
   p.set(":timeout", kSolverTimeout);
@@ -107,17 +93,11 @@ Solver::Solver(
   readInput();
 }
 
-void Solver::push() {
-  solver_.push();
-}
+void Solver::push() { solver_.push(); }
 
-void Solver::reset() {
-  solver_.reset();
-}
+void Solver::reset() { solver_.reset(); }
 
-void Solver::pop() {
-  solver_.pop();
-}
+void Solver::pop() { solver_.pop(); }
 
 void Solver::add(z3::expr expr) {
   if (!expr.is_const())
@@ -127,14 +107,12 @@ void Solver::add(z3::expr expr) {
 z3::check_result Solver::check() {
   uint64_t before = getTimeStamp();
   z3::check_result res;
-  LOG_STAT(
-      "SMT: { \"solving_time\": " + decstr(solving_time_) + ", "
-      + "\"total_time\": " + decstr(before - start_time_) + " }\n");
+  LOG_STAT("SMT: { \"solving_time\": " + decstr(solving_time_) + ", " +
+           "\"total_time\": " + decstr(before - start_time_) + " }\n");
   // LOG_DEBUG("Constraints: " + solver_.to_smt2() + "\n");
   try {
     res = solver_.check();
-  }
-  catch(z3::exception e) {
+  } catch (z3::exception e) {
     // https://github.com/Z3Prover/z3/issues/419
     // timeout can cause exception
     res = z3::unknown;
@@ -146,18 +124,17 @@ z3::check_result Solver::check() {
   return res;
 }
 
-bool Solver::checkAndSave(const std::string& postfix) {
+bool Solver::checkAndSave(const std::string &postfix) {
   if (check() == z3::sat) {
     saveValues(postfix);
     return true;
-  }
-  else {
+  } else {
     LOG_DEBUG("unsat\n");
     return false;
   }
 }
 
-void Solver::addJcc(ExprRef e, bool taken, ADDRINT pc) {
+void Solver::addJcc(ExprRef e, bool taken, bool want, ADDRINT pc) {
   // Save the last instruction pointer for debugging
   last_pc_ = pc;
 
@@ -166,7 +143,7 @@ void Solver::addJcc(ExprRef e, bool taken, ADDRINT pc) {
 
   // if e == Bool(true), then ignore
   if (e->kind() == Bool) {
-    assert(!(castAs<BoolExpr>(e)->value()  ^ taken));
+    assert(!(castAs<BoolExpr>(e)->value() ^ taken));
     return;
   }
 
@@ -178,12 +155,11 @@ void Solver::addJcc(ExprRef e, bool taken, ADDRINT pc) {
   if (pc == 0) {
     // If addJcc() is called by special case, then rely on last_interested_
     is_interesting = last_interested_;
-  }
-  else
-    is_interesting = isInterestingJcc(e, taken, pc);
+  } else
+    is_interesting = isInterestingJcc(e, taken, want, pc);
 
   if (is_interesting)
-    negatePath(e, taken);
+    explorePath(e, want);
   addConstraint(e, taken, is_interesting);
 }
 
@@ -237,7 +213,8 @@ void Solver::solveAll(ExprRef e, llvm::APInt val) {
   if (last_interested_) {
     std::string postfix = "";
     ExprRef expr_val = g_expr_builder->createConstant(val, e->bits());
-    ExprRef expr_concrete = g_expr_builder->createBinaryExpr(Equal, e, expr_val);
+    ExprRef expr_concrete =
+        g_expr_builder->createBinaryExpr(Equal, e, expr_val);
 
     reset();
     syncConstraints(e);
@@ -251,7 +228,7 @@ void Solver::solveAll(ExprRef e, llvm::APInt val) {
     }
 
     z3::expr z3_expr = e->toZ3Expr();
-    while(true) {
+    while (true) {
       if (!checkAndSave(postfix))
         break;
       z3::expr value = getPossibleValue(z3_expr);
@@ -274,15 +251,14 @@ void Solver::checkOutDir() {
   }
 
   struct stat info;
-  if (stat(out_dir_.c_str(), &info) != 0
-      || !(info.st_mode & S_IFDIR)) {
+  if (stat(out_dir_.c_str(), &info) != 0 || !(info.st_mode & S_IFDIR)) {
     LOG_FATAL("No such directory\n");
     exit(-1);
   }
 }
 
 void Solver::readInput() {
-  std::ifstream ifs (input_file_, std::ifstream::in | std::ifstream::binary);
+  std::ifstream ifs(input_file_, std::ifstream::in | std::ifstream::binary);
   if (ifs.fail()) {
     LOG_FATAL("Cannot open an input file\n");
     exit(-1);
@@ -311,7 +287,7 @@ std::vector<UINT8> Solver::getConcreteValues() {
   return values;
 }
 
-void Solver::saveValues(const std::string& postfix) {
+void Solver::saveValues(const std::string &postfix) {
   std::vector<UINT8> values = getConcreteValues();
 
   // If no output directory is specified, then just print it out
@@ -320,26 +296,26 @@ void Solver::saveValues(const std::string& postfix) {
     return;
   }
 
-  std::string fname = out_dir_+ "/" + toString6digit(num_generated_);
+  std::string fname = out_dir_ + "/" + toString6digit(num_generated_);
   // Add postfix to record where it is genereated
   if (!postfix.empty())
-      fname = fname + "-" + postfix;
+    fname = fname + "-" + postfix;
   ofstream of(fname, std::ofstream::out | std::ofstream::binary);
   LOG_INFO("New testcase: " + fname + "\n");
   if (of.fail())
     LOG_FATAL("Unable to open a file to write results\n");
 
-      // TODO: batch write
-      for (unsigned i = 0; i < values.size(); i++) {
-        char val = values[i];
-        of.write(&val, sizeof(val));
-      }
+  // TODO: batch write
+  for (unsigned i = 0; i < values.size(); i++) {
+    char val = values[i];
+    of.write(&val, sizeof(val));
+  }
 
   of.close();
   num_generated_++;
 }
 
-void Solver::printValues(const std::vector<UINT8>& values) {
+void Solver::printValues(const std::vector<UINT8> &values) {
   fprintf(stderr, "[INFO] Values: ");
   for (unsigned i = 0; i < values.size(); i++) {
     fprintf(stderr, "\\x%02X", values[i]);
@@ -347,53 +323,51 @@ void Solver::printValues(const std::vector<UINT8>& values) {
   fprintf(stderr, "\n");
 }
 
-z3::expr Solver::getPossibleValue(z3::expr& z3_expr) {
+z3::expr Solver::getPossibleValue(z3::expr &z3_expr) {
   z3::model m = solver_.get_model();
   return m.eval(z3_expr);
 }
 
-z3::expr Solver::getMinValue(z3::expr& z3_expr) {
+z3::expr Solver::getMinValue(z3::expr &z3_expr) {
   push();
   z3::expr value(context_);
   while (true) {
     if (checkAndSave()) {
       value = getPossibleValue(z3_expr);
       solver_.add(z3::ult(z3_expr, value));
-    }
-    else
+    } else
       break;
   }
   pop();
   return value;
 }
 
-z3::expr Solver::getMaxValue(z3::expr& z3_expr) {
+z3::expr Solver::getMaxValue(z3::expr &z3_expr) {
   push();
   z3::expr value(context_);
   while (true) {
     if (checkAndSave()) {
       value = getPossibleValue(z3_expr);
       solver_.add(z3::ugt(z3_expr, value));
-    }
-    else
+    } else
       break;
   }
   pop();
   return value;
 }
 
-void Solver::addToSolver(ExprRef e, bool taken) {
+void Solver::addToSolver(ExprRef e, bool want) {
   e->simplify();
-  if (!taken)
+  if (!want)
     e = g_expr_builder->createLNot(e);
   add(e->toZ3Expr());
 }
 
 void Solver::syncConstraints(ExprRef e) {
   std::set<std::shared_ptr<DependencyTree<Expr>>> forest;
-  DependencySet* deps = e->getDependencies();
+  DependencySet *deps = e->getDependencies();
 
-  for (const size_t& index : *deps)
+  for (const size_t &index : *deps)
     forest.insert(dep_forest_.find(index));
 
   for (std::shared_ptr<DependencyTree<Expr>> tree : forest) {
@@ -414,7 +388,8 @@ void Solver::syncConstraints(ExprRef e) {
 
         // One of range expressions should be non-NULL
         if (!valid)
-          LOG_INFO(std::string(__func__) + ": Incorrect constraints are inserted\n");
+          LOG_INFO(std::string(__func__) +
+                   ": Incorrect constraints are inserted\n");
       }
     }
   }
@@ -457,10 +432,9 @@ bool Solver::addRangeConstraint(ExprRef e, bool taken) {
   if (!taken)
     kind = negateKind(kind);
 
-  canonical->addConstraint(kind, value,
-      adjustment);
+  canonical->addConstraint(kind, value, adjustment);
   addConstraint(canonical);
-  //updated_exprs_.insert(canonical);
+  // updated_exprs_.insert(canonical);
   return true;
 }
 
@@ -478,19 +452,16 @@ ExprRef Solver::getRangeConstraint(ExprRef e, bool is_unsigned) {
     return NULL;
 
   ExprRef expr = NULL;
-  for (auto i = rs->begin(), end = rs->end();
-      i != end; i++) {
-    const llvm::APSInt& from = i->From();
-    const llvm::APSInt& to = i->To();
+  for (auto i = rs->begin(), end = rs->end(); i != end; i++) {
+    const llvm::APSInt &from = i->From();
+    const llvm::APSInt &to = i->To();
     ExprRef bound = NULL;
 
     if (from == to) {
       // can simplify this case
       ExprRef imm = g_expr_builder->createConstant(from, e->bits());
       bound = g_expr_builder->createEqual(e, imm);
-    }
-    else
-    {
+    } else {
       ExprRef lb_imm = g_expr_builder->createConstant(i->From(), e->bits());
       ExprRef ub_imm = g_expr_builder->createConstant(i->To(), e->bits());
       ExprRef lb = g_expr_builder->createBinaryExpr(lower_kind, e, lb_imm);
@@ -507,23 +478,23 @@ ExprRef Solver::getRangeConstraint(ExprRef e, bool is_unsigned) {
   return expr;
 }
 
-
-bool Solver::isInterestingJcc(ExprRef rel_expr, bool taken, ADDRINT pc) {
-  bool interesting = trace_.isInterestingBranch(pc, taken);
+bool Solver::isInterestingJcc(ExprRef rel_expr, bool taken, bool want,
+                              ADDRINT pc) {
+  bool interesting = trace_.isInterestingBranch(pc, taken, want);
   // record for other decision
   last_interested_ = interesting;
   return interesting;
 }
 
-void Solver::negatePath(ExprRef e, bool taken) {
+void Solver::explorePath(ExprRef e, bool want) {
   reset();
   syncConstraints(e);
-  addToSolver(e, !taken);
+  addToSolver(e, want);
   bool sat = checkAndSave();
   if (!sat) {
     reset();
     // optimistic solving
-    addToSolver(e, !taken);
+    addToSolver(e, want);
     checkAndSave("optimistic");
   }
 }

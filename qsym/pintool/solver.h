@@ -1,19 +1,19 @@
 #ifndef QSYM_SOLVER_H_
 #define QSYM_SOLVER_H_
 
-#include <z3++.h>
 #include <fstream>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <sys/stat.h>
+#include <z3++.h>
 
 #include "pin.H"
 
 #include "afl_trace_map.h"
 #include "expr.h"
 // #include "thread_context.h"
-#include "expr_builder.h"
 #include "dependency.h"
+#include "expr_builder.h"
 
 namespace qsym {
 
@@ -25,10 +25,8 @@ public:
   ExprRefSetTy updated_exprs_;
   ExprRefSetTy added_exprs_;
 
-  Solver(
-      const std::string input_file,
-      const std::string out_dir,
-      const std::string bitmap);
+  Solver(const std::string input_file, const std::string out_dir,
+         const std::string bitmap);
   virtual ~Solver() = default;
 
   void push();
@@ -37,8 +35,8 @@ public:
   void add(z3::expr expr);
   z3::check_result check();
 
-  bool checkAndSave(const std::string& postfix="");
-  void addJcc(ExprRef, bool, ADDRINT);
+  bool checkAndSave(const std::string &postfix = "");
+  void addJcc(ExprRef, bool, bool, ADDRINT);
   void addAddr(ExprRef, ADDRINT);
   void addAddr(ExprRef, llvm::APInt);
   void addValue(ExprRef, ADDRINT);
@@ -49,31 +47,31 @@ public:
   ADDRINT last_pc() { return last_pc_; }
 
 protected:
-  std::string           input_file_;
-  std::vector<UINT8>    inputs_;
-  std::string           out_dir_;
-  z3::context&          context_;
-  z3::solver            solver_;
-  std::string           session_;
-  INT32                 num_generated_;
-  AflTraceMap           trace_;
-  bool                  last_interested_;
-  bool                  syncing_;
-  uint64_t              start_time_;
-  uint64_t              solving_time_;
-  ADDRINT               last_pc_;
+  std::string input_file_;
+  std::vector<UINT8> inputs_;
+  std::string out_dir_;
+  z3::context &context_;
+  z3::solver solver_;
+  std::string session_;
+  INT32 num_generated_;
+  AflTraceMap trace_;
+  bool last_interested_;
+  bool syncing_;
+  uint64_t start_time_;
+  uint64_t solving_time_;
+  ADDRINT last_pc_;
   DependencyForest<Expr> dep_forest_;
 
   void checkOutDir();
   void readInput();
 
   std::vector<UINT8> getConcreteValues();
-  virtual void saveValues(const std::string& postfix);
-  void printValues(const std::vector<UINT8>& values);
+  virtual void saveValues(const std::string &postfix);
+  void printValues(const std::vector<UINT8> &values);
 
-  z3::expr getPossibleValue(z3::expr& z3_expr);
-  z3::expr getMinValue(z3::expr& z3_expr);
-  z3::expr getMaxValue(z3::expr& z3_expr);
+  z3::expr getPossibleValue(z3::expr &z3_expr);
+  z3::expr getMinValue(z3::expr &z3_expr);
+  z3::expr getMaxValue(z3::expr &z3_expr);
 
   void addToSolver(ExprRef e, bool taken);
   void syncConstraints(ExprRef e);
@@ -85,14 +83,14 @@ protected:
 
   ExprRef getRangeConstraint(ExprRef e, bool is_unsigned);
 
-  bool isInterestingJcc(ExprRef, bool, ADDRINT);
-  void negatePath(ExprRef, bool);
+  bool isInterestingJcc(ExprRef, bool, bool, ADDRINT);
+  void explorePath(ExprRef, bool);
   void solveOne(z3::expr);
 
   void checkFeasible();
 };
 
-extern Solver* g_solver;
+extern Solver *g_solver;
 
 } // namespace qsym
 
