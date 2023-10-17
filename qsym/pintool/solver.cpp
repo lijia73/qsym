@@ -120,7 +120,7 @@ z3::check_result Solver::check() {
   uint64_t cur = getTimeStamp();
   uint64_t elapsed = cur - before;
   solving_time_ += elapsed;
-  LOG_STAT("SMT: { \"solving_time\": " + decstr(solving_time_) + " }\n");
+  LOG_STAT("SMT: { \"solving_time_once\": " + decstr(elapsed) + " }\n");
   return res;
 }
 
@@ -480,7 +480,9 @@ ExprRef Solver::getRangeConstraint(ExprRef e, bool is_unsigned) {
 
 bool Solver::isInterestingJcc(ExprRef rel_expr, bool taken, bool want,
                               ADDRINT pc) {
-  bool interesting = trace_.isInterestingBranch(pc, taken, want);
+  if (taken == want)
+    return false;
+  bool interesting = trace_.isInterestingBranch(pc, taken);
   // record for other decision
   last_interested_ = interesting;
   return interesting;
