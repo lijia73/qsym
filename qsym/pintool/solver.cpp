@@ -482,7 +482,7 @@ bool Solver::isInterestingJcc(ExprRef rel_expr, bool taken, bool want,
                               ADDRINT pc) {
   if (taken == want)
     return false;
-  bool interesting = trace_.isInterestingBranch(pc, taken);
+  bool interesting = trace_.isInterestingBranch(pc, taken,want);
   // record for other decision
   last_interested_ = interesting;
   return interesting;
