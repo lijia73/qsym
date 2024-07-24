@@ -134,7 +134,15 @@ bool Solver::checkAndSave(const std::string &postfix) {
   }
 }
 
-void Solver::addJcc(ExprRef e, bool taken, bool want, ADDRINT pc) {
+z3::expr_vector Solver::getAssertions(){
+  return solver_.assertions();
+}
+
+std::string Solver::getSmt2String(){
+  return solver_.to_smt2();
+}
+
+ void Solver::addJcc(ExprRef e, bool taken, bool want, ADDRINT pc) {
   // Save the last instruction pointer for debugging
   last_pc_ = pc;
 
@@ -296,7 +304,7 @@ void Solver::saveValues(const std::string &postfix) {
     return;
   }
 
-  std::string fname = out_dir_ + "/" + toString6digit(num_generated_);
+  std::string fname = out_dir_ + "/o/" + toString6digit(num_generated_);
   // Add postfix to record where it is genereated
   if (!postfix.empty())
     fname = fname + "-" + postfix;
@@ -493,12 +501,12 @@ void Solver::explorePath(ExprRef e, bool want) {
   syncConstraints(e);
   addToSolver(e, want);
   bool sat = checkAndSave();
-  if (!sat) {
-    reset();
+  //if (!sat) {
+  //  reset();
     // optimistic solving
-    addToSolver(e, want);
-    checkAndSave("optimistic");
-  }
+  //  addToSolver(e, want);
+  //  checkAndSave("optimistic");
+  //}
 }
 
 void Solver::solveOne(z3::expr z3_expr) {
