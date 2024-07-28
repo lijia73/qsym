@@ -138,7 +138,19 @@ z3::expr_vector Solver::getAssertions(){
   return solver_.assertions();
 }
 
+std::string Solver::getRelatedSmt2String(ExprRef e){
+  reset();
+  syncConstraints(e);
+  return solver_.to_smt2();
+}
+
 std::string Solver::getSmt2String(){
+  reset();
+  for (auto &e : all_constraints){
+    // e->simplify();
+    // LOG_STAT(e->toZ3Expr().simplify().to_string()+'\n');
+    addToSolver(e, true);
+  }
   return solver_.to_smt2();
 }
 
@@ -366,9 +378,11 @@ z3::expr Solver::getMaxValue(z3::expr &z3_expr) {
 
 void Solver::addToSolver(ExprRef e, bool want) {
   e->simplify();
-  if (!want)
-    e = g_expr_builder->createLNot(e);
-  add(e->toZ3Expr());
+  if (!want){
+    add(g_expr_builder->createLNot(e)->toZ3Expr());
+  }else{
+    add(e->toZ3Expr());
+  }
 }
 
 void Solver::syncConstraints(ExprRef e) {
@@ -410,7 +424,10 @@ void Solver::addConstraint(ExprRef e, bool taken, bool is_interesting) {
     addConstraint(NE->expr(), !taken, is_interesting);
     return;
   }
-  if (!addRangeConstraint(e, taken))
+  if (!taken)all_constraints.push_back(g_expr_builder->createLNot(e));
+  else all_constraints.push_back(e);
+  
+  // if (!addRangeConstraint(e, taken))
     addNormalConstraint(e, taken);
 }
 
@@ -422,6 +439,8 @@ void Solver::addConstraint(ExprRef e) {
   }
   if (e->isConcrete())
     return;
+  
+  //LOG_STAT(e->toZ3Expr().simplify().to_string()+'\n');
   dep_forest_.addNode(e);
 }
 
@@ -490,7 +509,7 @@ bool Solver::isInterestingJcc(ExprRef rel_expr, bool taken, bool want,
                               ADDRINT pc) {
   if (taken == want)
     return false;
-  bool interesting = trace_.isInterestingBranch(pc, taken,want);
+  bool interesting = trace_.isInterestingBranch(pc, taken, want);
   // record for other decision
   last_interested_ = interesting;
   return interesting;

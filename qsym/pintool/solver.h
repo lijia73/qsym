@@ -36,6 +36,7 @@ public:
   z3::check_result check();
   z3::expr_vector getAssertions();
   std::string getSmt2String();
+  std::string getRelatedSmt2String(ExprRef);
 
   bool checkAndSave(const std::string &postfix = "");
   void addJcc(ExprRef, bool, bool, ADDRINT);
@@ -63,6 +64,7 @@ protected:
   uint64_t solving_time_;
   ADDRINT last_pc_;
   DependencyForest<Expr> dep_forest_;
+  std::vector<ExprRef> all_constraints;
 
   void checkOutDir();
   void readInput();
