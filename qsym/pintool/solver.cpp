@@ -427,7 +427,7 @@ void Solver::addConstraint(ExprRef e, bool taken, bool is_interesting) {
   if (!taken)all_constraints.push_back(g_expr_builder->createLNot(e));
   else all_constraints.push_back(e);
   
-  // if (!addRangeConstraint(e, taken))
+  if (!addRangeConstraint(e, taken))
     addNormalConstraint(e, taken);
 }
 
