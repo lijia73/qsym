@@ -154,7 +154,7 @@ std::string Solver::getSmt2String(){
   return solver_.to_smt2();
 }
 
- void Solver::addJcc(ExprRef e, bool taken, bool want, ADDRINT pc) {
+ void Solver::addJcc(ExprRef e, bool taken, bool want, ADDRINT pc, int prior) {
   // Save the last instruction pointer for debugging
   last_pc_ = pc;
 
@@ -179,7 +179,7 @@ std::string Solver::getSmt2String(){
     is_interesting = isInterestingJcc(e, taken, want, pc);
 
   if (is_interesting)
-    explorePath(e, want);
+    explorePath(e, want, prior);
   addConstraint(e, taken, is_interesting);
 }
 
@@ -515,11 +515,11 @@ bool Solver::isInterestingJcc(ExprRef rel_expr, bool taken, bool want,
   return interesting;
 }
 
-void Solver::explorePath(ExprRef e, bool want) {
+void Solver::explorePath(ExprRef e, bool want, int prior) {
   reset();
   syncConstraints(e);
   addToSolver(e, want);
-  bool sat = checkAndSave();
+  bool sat = checkAndSave(std::to_string(prior));
   //if (!sat) {
   //  reset();
     // optimistic solving

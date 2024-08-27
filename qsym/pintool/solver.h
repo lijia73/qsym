@@ -39,7 +39,7 @@ public:
   std::string getRelatedSmt2String(ExprRef);
 
   bool checkAndSave(const std::string &postfix = "");
-  void addJcc(ExprRef, bool, bool, ADDRINT);
+  void addJcc(ExprRef, bool, bool, ADDRINT, int prior);
   void addAddr(ExprRef, ADDRINT);
   void addAddr(ExprRef, llvm::APInt);
   void addValue(ExprRef, ADDRINT);
@@ -88,7 +88,7 @@ protected:
   ExprRef getRangeConstraint(ExprRef e, bool is_unsigned);
 
   bool isInterestingJcc(ExprRef, bool, bool, ADDRINT);
-  void explorePath(ExprRef, bool);
+  void explorePath(ExprRef, bool, int);
   void solveOne(z3::expr);
 
   void checkFeasible();
