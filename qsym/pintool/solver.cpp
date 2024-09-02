@@ -377,11 +377,16 @@ z3::expr Solver::getMaxValue(z3::expr &z3_expr) {
 }
 
 void Solver::addToSolver(ExprRef e, bool want) {
-  e->simplify();
-  if (!want){
-    add(g_expr_builder->createLNot(e)->toZ3Expr());
-  }else{
-    add(e->toZ3Expr());
+  try {
+    e->simplify();
+    
+    if (!want){
+      add(g_expr_builder->createLNot(e)->toZ3Expr());
+    }else{
+      add(e->toZ3Expr());
+    }
+  }catch (const z3::exception& e) {
+    std::cerr << "Caught a z3::exception: " << e.what() << e << std::endl;
   }
 }
 
