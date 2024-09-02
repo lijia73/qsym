@@ -520,12 +520,13 @@ void Solver::explorePath(ExprRef e, bool want, int prior) {
   syncConstraints(e);
   addToSolver(e, want);
   bool sat = checkAndSave(std::to_string(prior));
-  //if (!sat) {
-  //  reset();
-    // optimistic solving
-  //  addToSolver(e, want);
-  //  checkAndSave("optimistic");
-  //}
+  if (!sat) {
+   reset();
+   // optimistic solving
+   addToSolver(e, want);
+   checkAndSave(std::to_string(prior));
+   //checkAndSave("optimistic");
+  }
 }
 
 void Solver::solveOne(z3::expr z3_expr) {
