@@ -109,7 +109,7 @@ z3::check_result Solver::check() {
   z3::check_result res;
   LOG_STAT("SMT: { \"solving_time\": " + decstr(solving_time_) + ", " +
            "\"total_time\": " + decstr(before - start_time_) + " }\n");
-  // LOG_DEBUG("Constraints: " + solver_.to_smt2() + "\n");
+  
   try {
     res = solver_.check();
   } catch (z3::exception e) {
@@ -121,6 +121,7 @@ z3::check_result Solver::check() {
   uint64_t elapsed = cur - before;
   solving_time_ += elapsed;
   LOG_STAT("SMT: { \"solving_time_once\": " + decstr(elapsed) + " }\n");
+  LOG_STAT("Constraints:\n " + solver_.to_smt2());
   return res;
 }
 
@@ -321,7 +322,7 @@ void Solver::saveValues(const std::string &postfix) {
   if (!postfix.empty())
     fname = fname + "-" + postfix;
   ofstream of(fname, std::ofstream::out | std::ofstream::binary);
-  LOG_INFO("New testcase: " + fname + "\n");
+  LOG_INFO("New testcase: " + fname + "\n\n");
   if (of.fail())
     LOG_FATAL("Unable to open a file to write results\n");
 
